@@ -172,6 +172,8 @@
   <!-- Leaflet & Turf JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
+  <!-- Leaflet Heat Plugin -->
+  <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
 
   <script>
     // ===============================
@@ -204,7 +206,9 @@
     var markerLayer = L.layerGroup();
     var userReportLayer = L.layerGroup();
     var trafficIncidentLayer = L.layerGroup();
+    var heatmapLayer = null; // Heatmap GeoAI layer
     var userReportIndex = {}; // _id -> marker
+    var cachedBlackspotData = null; // Simpan data blackspot untuk refresh heatmap
     var analysisMarker = null;
     var destinationMarker = null;
     var analysisLine = null;
@@ -706,6 +710,9 @@
               delete userReportIndex[props._id];
             }
 
+            // Perbarui heatmap setelah menghapus laporan
+            refreshHeatmap();
+
             removeAnalysisFeature(props._uid || props._id);
             if (highlightedMarkerState.marker && highlightedMarkerState.marker.__featureUid === (props._uid || props._id)) {
               highlightedMarkerState.marker = null;
@@ -750,6 +757,9 @@
           addUserReportFeature(feature);
           saveUserReport(feature);
           updateSidebar(feature);
+
+          // Perbarui heatmap setelah menambah laporan baru
+          refreshHeatmap();
 
           reportBtn.disabled = false;
           reportBtn.innerHTML = originalLabel;
@@ -798,15 +808,30 @@
       "Satellite": satellite
     };
 
+    // Inisialisasi heatmap layer dengan data kosong (akan diupdate saat data GeoJSON dimuat)
+    heatmapLayer = L.heatLayer([], {
+      radius: 50,
+      blur: 30,
+      maxZoom: 17,
+      minOpacity: 0.5,
+      gradient: {
+        0.0: 'yellow',
+        0.5: 'orange',
+        1.0: 'red'
+      }
+    });
+
     var overlayMaps = {
       "Titik Blackspot": markerLayer,
       "Laporan Pengguna": userReportLayer,
       "Insiden Lalu Lintas (TomTom)": trafficIncidentLayer,
+      "GeoAI: Heatmap Kepadatan Kecelakaan": heatmapLayer,
       "Jalur Utama": polylineLayer,
       "Batas Kecamatan": polygonLayer
     };
 
-    L.control.layers(baseMaps, overlayMaps).addTo(map);
+    // Simpan reference ke layer control agar bisa diupdate
+    var layerControl = L.control.layers(baseMaps, overlayMaps).addTo(map);
 
     // Default tampil semua overlay
     markerLayer.addTo(map);
@@ -993,11 +1018,219 @@
     setInterval(getTrafficIncidents, 5 * 60 * 1000);
 
     // ===============================
+    // GEOAI: HEATMAP KEPADATAN KECELAKAAN (DATA-DRIVEN)
+    // ===============================
+    /**
+     * Menggabungkan data blackspot dan laporan pengguna menjadi satu GeoJSON untuk heatmap
+     * @param {Object} blackspotData - Data GeoJSON dari file blackspot.geojson
+     * @returns {Object} GeoJSON yang sudah digabungkan
+     */
+    function combineDataForHeatmap(blackspotData) {
+      var combinedFeatures = [];
+      
+      // Tambahkan data dari blackspot.geojson
+      if (blackspotData && blackspotData.features && Array.isArray(blackspotData.features)) {
+        blackspotData.features.forEach(function(feature) {
+          combinedFeatures.push(feature);
+        });
+      }
+      
+      // Tambahkan data dari laporan pengguna (localStorage)
+      try {
+        var raw = localStorage.getItem('userReports');
+        if (raw) {
+          var userReportsData = JSON.parse(raw);
+          if (userReportsData && Array.isArray(userReportsData.features)) {
+            userReportsData.features.forEach(function(feature) {
+              combinedFeatures.push(feature);
+            });
+          }
+        }
+      } catch (e) {
+        console.warn('Gagal memuat laporan pengguna untuk heatmap:', e);
+      }
+      
+      return {
+        type: 'FeatureCollection',
+        features: combinedFeatures
+      };
+    }
+
+    /**
+     * Memperbarui heatmap dengan data terbaru (blackspot + laporan pengguna)
+     */
+    function refreshHeatmap() {
+      if (cachedBlackspotData) {
+        var combinedData = combineDataForHeatmap(cachedBlackspotData);
+        loadHeatmapFromGeoJSON(combinedData);
+      }
+    }
+
+    /**
+     * Menghitung weight berdasarkan jumlah kecelakaan (data-driven approach)
+     * @param {number} jumlahKecelakaan - Jumlah kejadian kecelakaan
+     * @returns {number} Weight untuk heatmap (0.3, 0.6, atau 1.0)
+     */
+    function calculateWeightFromAccidentCount(jumlahKecelakaan) {
+      if (!jumlahKecelakaan || isNaN(jumlahKecelakaan) || jumlahKecelakaan < 1) {
+        return 1.0; // Default weight jika atribut tidak ada
+      }
+      var count = parseInt(jumlahKecelakaan, 10);
+      if (count >= 1 && count <= 5) {
+        return 0.3;
+      } else if (count >= 6 && count <= 15) {
+        return 0.6;
+      } else if (count > 15) {
+        return 1.0;
+      }
+      return 1.0; // Fallback
+    }
+
+    /**
+     * Mengekstrak nilai jumlah kecelakaan dari feature properties
+     * Mencari berbagai kemungkinan nama atribut
+     * @param {Object} properties - Feature properties
+     * @returns {number|null} Jumlah kecelakaan atau null jika tidak ditemukan
+     */
+    function extractAccidentCount(properties) {
+      if (!properties) return null;
+      
+      // Daftar nama atribut yang mungkin berisi jumlah kecelakaan
+      var possibleKeys = [
+        'jumlah_kecelakaan', 'jumlahKecelakaan', 'jumlah', 'total',
+        'total_kecelakaan', 'totalKecelakaan', 'accident_count',
+        'count', 'frekuensi', 'frequency', 'jumlah_kejadian'
+      ];
+      
+      for (var i = 0; i < possibleKeys.length; i++) {
+        var key = possibleKeys[i];
+        if (properties.hasOwnProperty(key)) {
+          var value = properties[key];
+          // Coba konversi ke number
+          var numValue = parseFloat(value);
+          if (!isNaN(numValue) && numValue > 0) {
+            return numValue;
+          }
+        }
+      }
+      
+      return null;
+    }
+
+    /**
+     * Membuat atau memperbarui heatmap layer dari data GeoJSON Point
+     * Menggunakan pendekatan DATA-DRIVEN dengan weight otomatis
+     * @param {Object} geoJsonData - Data GeoJSON dengan feature Point
+     * @returns {L.HeatLayer|null} Layer heatmap atau null jika gagal
+     */
+    function loadHeatmapFromGeoJSON(geoJsonData) {
+      try {
+        if (!geoJsonData || !geoJsonData.features || !Array.isArray(geoJsonData.features)) {
+          console.warn('Data GeoJSON tidak valid untuk heatmap');
+          return null;
+        }
+
+        // Ekstrak koordinat dan weight dari Point features (DATA-DRIVEN)
+        var heatmapPoints = [];
+        var totalPoints = 0;
+        var weightedPoints = 0;
+        
+        geoJsonData.features.forEach(function(feature) {
+          if (feature.geometry && feature.geometry.type === 'Point' && feature.geometry.coordinates) {
+            var coords = feature.geometry.coordinates;
+            // Konversi dari GeoJSON format [lng, lat] ke format heatmap [lat, lng, weight]
+            if (coords.length >= 2 && typeof coords[0] === 'number' && typeof coords[1] === 'number') {
+              var lat = coords[1];
+              var lng = coords[0];
+              // Validasi koordinat
+              if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+                // Ekstrak jumlah kecelakaan dari properties dan hitung weight
+                var jumlahKecelakaan = extractAccidentCount(feature.properties || {});
+                var weight = calculateWeightFromAccidentCount(jumlahKecelakaan);
+                
+                // Format: [lat, lng, weight] - DATA-DRIVEN dengan weight otomatis
+                heatmapPoints.push([lat, lng, weight]);
+                totalPoints++;
+                if (jumlahKecelakaan !== null) {
+                  weightedPoints++;
+                }
+              }
+            }
+          }
+        });
+
+        if (heatmapPoints.length === 0) {
+          console.warn('Tidak ada koordinat Point yang valid untuk heatmap');
+          return null;
+        }
+
+        // Hapus layer heatmap lama dari map dan Layer Control jika sudah ditambahkan
+        var wasOnMap = false;
+        if (heatmapLayer) {
+          if (map.hasLayer(heatmapLayer)) {
+            map.removeLayer(heatmapLayer);
+            wasOnMap = true;
+          }
+          // Hapus layer lama dari Layer Control
+          if (typeof layerControl !== 'undefined' && layerControl) {
+            try {
+              layerControl.removeLayer(heatmapLayer);
+            } catch (e) {
+              // Ignore jika layer tidak ada di control
+            }
+          }
+        }
+
+        // Buat layer heatmap baru dengan konfigurasi untuk skala kabupaten (DATA-DRIVEN)
+        var newHeatmapLayer = L.heatLayer(heatmapPoints, {
+          radius: 50,
+          blur: 30,
+          maxZoom: 17,
+          minOpacity: 0.5,
+          // Gradient kontinu: rendah (kuning) → sedang (oranye) → tinggi (merah)
+          gradient: {
+            0.0: 'yellow',
+            0.5: 'orange',
+            1.0: 'red'
+          }
+        });
+
+        // Update variabel dan reference di overlayMaps
+        heatmapLayer = newHeatmapLayer;
+        overlayMaps["GeoAI: Heatmap Kepadatan Kecelakaan"] = heatmapLayer;
+
+        // Tambahkan layer baru ke Layer Control agar bisa dikontrol
+        if (typeof layerControl !== 'undefined' && layerControl) {
+          layerControl.addOverlay(heatmapLayer, "GeoAI: Heatmap Kepadatan Kecelakaan");
+        }
+
+        // Tambahkan kembali ke map HANYA jika sebelumnya sudah aktif di Layer Control
+        // Jangan tambahkan secara default - biarkan user mengaktifkan melalui Layer Control
+        if (wasOnMap) {
+          heatmapLayer.addTo(map);
+        }
+
+        console.log('Heatmap GeoAI (DATA-DRIVEN) berhasil dibuat/diperbarui:');
+        console.log('  - Total titik: ' + totalPoints);
+        console.log('  - Titik dengan weight otomatis: ' + weightedPoints);
+        console.log('  - Titik dengan weight default: ' + (totalPoints - weightedPoints));
+        console.log('  - Aktifkan heatmap melalui Layer Control di pojok kanan atas peta');
+        return heatmapLayer;
+      } catch (error) {
+        console.error('Error membuat heatmap:', error);
+        return null;
+      }
+    }
+
+    // ===============================
     // MUAT DATA GEOJSON DARI FILE
     // ===============================
     fetch('data/blackspot.geojson')
       .then(function(res) { return res.json(); })
       .then(function(blackspotData) {
+        // Simpan data blackspot untuk digunakan saat refresh heatmap
+        cachedBlackspotData = blackspotData;
+        
         var baseFeatures = (blackspotData.features || []);
         baseFeatures.forEach(ensureFeatureId);
         setAnalysisFeatures(baseFeatures);
@@ -1026,6 +1259,10 @@
 
         // Muat laporan pengguna dari localStorage
         loadUserReports();
+
+        // Muat heatmap GeoAI dari data blackspot + laporan pengguna (gabungan)
+        var combinedData = combineDataForHeatmap(blackspotData);
+        loadHeatmapFromGeoJSON(combinedData);
       })
       .catch(function(err) {
         console.error('Gagal memuat data GeoJSON:', err);
