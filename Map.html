@@ -7,7 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="assets/styles.css" />
+  <link rel="stylesheet" href="assets/styles.css?v=2" />
 </head>
 
 <body>
@@ -16,8 +16,16 @@
   <div id="map"></div>
 
   <!-- Traffic Status Overlay -->
-  <div class="overlay-status glass-panel">
-    <span id="trafficStatus">Memuat data map...</span>
+  <span id="trafficStatus">Memuat data map...</span>
+  </div>
+
+  <!-- Error Toast -->
+  <div id="errorToast" class="glass-panel"
+    style="position:absolute; top:80px; left:50%; transform:translateX(-50%); padding:12px 20px; border-radius:12px; border:1px solid #ef4444; background:rgba(239, 68, 68, 0.2); color:#fff; display:none; z-index:9999; text-align:center;">
+    <strong style="display:block; margin-bottom:4px">Gagal Memuat Data</strong>
+    <span id="errorMsg" style="font-size:13px"></span>
+    <button onclick="this.parentElement.style.display='none'"
+      style="margin-left:12px; background:none; border:none; color:white; cursor:pointer;">✕</button>
   </div>
 
   <!-- App Shell -->
@@ -530,6 +538,9 @@
         updateDetailDrawer(feature);
         map.setView(latlng, 15);
       });
+
+      // Refresh heatmap jika fitur baru ditambahkan dan heatmap sedang aktif/ada
+      if (heatmapLayer) refreshHeatmap();
     }
 
     function saveUserReport(feature) {
@@ -565,17 +576,52 @@
           updateStats();
 
           // Load Heatmap
-          var heatPoints = data.features.map(f => [f.geometry.coordinates[1], f.geometry.coordinates[0], 0.5]);
-          heatmapLayer = L.heatLayer(heatPoints, { radius: 30, blur: 20 }).addTo(map);
-
-          // Zoom to first point
-          if (data.features.length > 0) {
-            var first = data.features[0].geometry.coordinates;
-            map.setView([first[1], first[0]], 11);
-          }
+          // Load Heatmap (Initial)
+          refreshHeatmap();
         }
       })
-      .catch(err => console.error("Failed handling geojson", err));
+      .catch(err => {
+        console.error("Failed handling geojson", err);
+        var toast = document.getElementById('errorToast');
+        var msg = document.getElementById('errorMsg');
+        toast.style.display = 'block';
+        msg.innerText = "Error: " + err.message + ". Pastikan file data/blackspot.geojson ada dan valid JSON.";
+      });
+
+    // --- Heatmap Logic ---
+    function refreshHeatmap() {
+      // Gabungkan semua data (Blackspot + Laporan User) yang ada di analysisState
+      var allFeatures = analysisState.features;
+
+      if (allFeatures.length === 0) return;
+
+      var heatPoints = allFeatures.map(f => [
+        f.geometry.coordinates[1],
+        f.geometry.coordinates[0],
+        0.6 // Intensitas standar
+      ]);
+
+      if (heatmapLayer) {
+        map.removeLayer(heatmapLayer);
+        if (overlayControl) overlayControl.removeLayer(heatmapLayer);
+      }
+
+      heatmapLayer = L.heatLayer(heatPoints, {
+        radius: 35,
+        blur: 20,
+        maxZoom: 15,
+        minOpacity: 0.3, // Lebih transparan (kurang terang)
+        gradient: {
+          0.4: 'blue',
+          0.65: 'lime',
+          1.0: 'red'
+        }
+      });
+
+      // Tambahkan ke control & map
+      if (overlayControl) overlayControl.addOverlay(heatmapLayer, "Heatmap Kepadatan");
+      heatmapLayer.addTo(map);
+    }
 
     // 3. TomTom Traffic
     function loadTraffic() {
@@ -612,9 +658,13 @@
       "Blackspots": markerLayer,
       "User Reports": userReportLayer,
       "TomTom Traffic": trafficIncidentLayer
-      // Heatmap handled manually as it might be null initially
     };
-    L.control.layers(baseMaps, overlays).addTo(map);
+    var overlayControl = L.control.layers(baseMaps, overlays).addTo(map);
+
+    // Default Layers
+    markerLayer.addTo(map);
+    userReportLayer.addTo(map);
+    trafficIncidentLayer.addTo(map);
 
   </script>
 </body>
