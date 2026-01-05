@@ -1,200 +1,271 @@
 <!DOCTYPE html>
-<html>
+<html lang="id">
+
 <head>
   <meta charset="utf-8" />
-  <title>Analisis Titik Rawan Kecelakaan (Blackspot) Kabupaten Sukabumi</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GIS Blackspot Sukabumi</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="assets/styles.css" />
-  <style>
-    html, body { margin: 0; padding: 0; height: 100%; }
-    #map { width: 100%; height: 70vh; }
-    .popup-content { font-family: Arial, sans-serif; line-height: 1.4; }
-    .popup-content h4 { margin: 0 0 5px; color: #b30000; }
-    .popup-content p { margin: 2px 0; }
-    .leaflet-tooltip {
-      background: rgba(0, 0, 0, 0.8);
-      color: white;
-      font-size: 13px;
-      padding: 3px 6px;
-      border-radius: 4px;
-    }
-    body { font-family: Arial, sans-serif; color: #1f2937; }
-    .container { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
-    .intro-title { margin: 0 0 8px; font-size: 28px; color: #111827; }
-    .intro-subtitle { margin: 0 0 16px; font-size: 16px; color: #4b5563; }
-    .intro { margin-bottom: 16px; }
-    /* Minimal inline fallback to ensure sidebar shows even if external CSS fails */
-    .split {
-      display: grid;
-      grid-template-columns: 340px minmax(0, 1fr) 340px;
-      gap: 16px;
-      align-items: stretch;
-      padding: 0 16px 24px;
-    }
-    .sidebar { background: #ffffff; border-radius: 12px; box-shadow: 0 6px 18px rgba(2,6,23,0.15); display: flex; flex-direction: column; }
-    .analysis-panel { padding: 20px; }
-    .analysis-panel .analysis-results { flex-grow: 1; }
-    .analysis-panel .sidebar-hero svg { width: 32px; height: 32px; }
-    .analysis-subtitle { color: #4b5563; margin: 4px 0 16px; font-size: 14px; }
-    .analysis-controls { display: flex; flex-direction: column; gap: 16px; margin-bottom: 8px; }
-    .analysis-controls .small { font-size: 13px; padding: 8px 12px; }
-    .analysis-controls .control-row { display: flex; flex-wrap: wrap; gap: 12px; }
-    .analysis-controls .control-row button { flex: 1; min-width: 150px; }
-    .analysis-controls .full-width { width: 100%; }
-    .radius-control { flex: 1; display: flex; flex-direction: column; }
-    .radius-control label { font-size: 12px; font-weight: 600; color: #6b7280; letter-spacing: 0.02em; }
-    .radius-input { display: flex; gap: 8px; margin-top: 6px; }
-    .radius-input input {
-      flex: 1;
-      padding: 8px;
-      border: 1px solid #d1d5db;
-      border-radius: 8px;
-    }
-    .analysis-results {
-      margin-top: 18px;
-      padding: 16px;
-      background: #f9fafb;
-      border-radius: 12px;
-      border: 1px dashed #d1d5db;
-      min-height: 60px;
-      font-size: 14px;
-    }
-    .analysis-results ul { margin: 8px 0 0 20px; padding: 0; }
-    .analysis-results li { margin-bottom: 4px; }
-    .radius-popup .leaflet-popup-content-wrapper {
-      background: #ecfdf5;
-      color: #065f46;
-      border: 1px solid #34d399;
-      border-radius: 10px;
-    }
-    .radius-popup .leaflet-popup-tip {
-      background: #ecfdf5;
-      border: 1px solid #34d399;
-    }
-    @media (max-width: 1100px) {
-      .split {
-        grid-template-columns: 1fr;
-      }
-      #map {
-        order: 3;
-        height: 60vh;
-      }
-    }
-  </style>
 </head>
+
 <body>
-  <div class="container intro">
-    <h1 class="intro-title">Analisis Titik Rawan Kecelakaan (Blackspot)</h1>
-    <p class="intro-subtitle">Kabupaten Sukabumi</p>
-    <p>
-      Halaman ini menampilkan peta interaktif lokasi-lokasi rawan kecelakaan
-      beserta informasi singkatnya. Silakan gulir ke bawah untuk melihat peta,
-      pilih layer yang diinginkan, dan klik marker untuk detail lokasi.
-    </p>
-    <div style="margin-top: 12px;">
-      <button id="refreshTrafficBtn" class="secondary-btn small" style="padding: 8px 16px; font-size: 14px;">
-        🔄 Refresh Insiden Lalu Lintas
-      </button>
-      <span id="trafficStatus" style="margin-left: 12px; font-size: 13px; color: #6b7280;"></span>
-    </div>
+
+  <!-- Map Container -->
+  <div id="map"></div>
+
+  <!-- Traffic Status Overlay -->
+  <div class="overlay-status glass-panel">
+    <span id="trafficStatus">Memuat data map...</span>
   </div>
 
-  <div class="split">
-    <aside id="sidebar" class="sidebar">
-      <div class="sidebar-hero">
-        <div class="hero-top">
-          <div class="hero-icon">
-            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg>
-          </div>
-          <div>
-            <p class="hero-title">Blackspot Details</p>
-            <p class="hero-subtitle">Klik marker pada peta untuk melihat ringkasan lokasi.</p>
-          </div>
-        </div>
-        <div class="hero-divider"></div>
+  <!-- App Shell -->
+  <div class="app-shell">
+
+    <!-- Navigation Rail -->
+    <nav class="nav-rail glass-panel clickable">
+      <div class="nav-logo">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+        </svg>
       </div>
-      <div id="sidebar-content" class="sidebar-content">
-        <div class="placeholder">
-          <div class="dot"></div>
-          <p>Pilih marker pada peta untuk menampilkan ringkasan kecelakaan.</p>
+
+      <button class="nav-btn active" id="navHome" title="Beranda" onclick="switchPanel('home')">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+          <polyline points="9 22 9 12 15 12 15 22"></polyline>
+        </svg>
+      </button>
+
+      <button class="nav-btn" id="navAnalysis" title="Analisis Spasial" onclick="switchPanel('analysis')">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="2" y1="12" x2="22" y2="12"></line>
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+        </svg>
+      </button>
+
+      <button class="nav-btn" id="navLayers" title="Filter Layer" onclick="switchPanel('layers')">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+          <polyline points="2 17 12 22 22 17"></polyline>
+          <polyline points="2 12 12 17 22 12"></polyline>
+        </svg>
+      </button>
+    </nav>
+
+    <!-- Side Panel (Analysis/Home/Layers) -->
+    <aside id="mainPanel" class="panel-drawer glass-panel clickable">
+
+      <!-- Home Content -->
+      <div id="panel-home" class="panel-view">
+        <div class="panel-header">
+          <h2 class="panel-title">Blackspot GIS</h2>
+          <p class="panel-subtitle">Kabupaten Sukabumi</p>
         </div>
-      </div>
-      <div class="sidebar-footer">
-        <button id="reportBtn" class="primary-btn" disabled>Laporkan Lokasi</button>
-        <button id="deleteBtn" class="danger-btn" disabled>Hapus Laporan</button>
-      </div>
-    </aside>
-    <div id="map"></div>
-    <aside id="analysis-sidebar" class="sidebar analysis-panel">
-      <div class="sidebar-hero">
-        <div class="hero-top">
-          <div class="hero-icon">
-            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 11l7 7 11-11" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </div>
-          <div>
-            <p class="hero-title">Analisis Spasial</p>
-            <p class="hero-subtitle">Tetapkan penanda referensi untuk menjalankan analisis jarak dan radius.</p>
-          </div>
-        </div>
-        <div class="hero-divider"></div>
-      </div>
-      <p class="analysis-subtitle">
-        Gunakan kontrol di bawah untuk mencari titik terdekat, mengambil semua titik dalam radius, menghitung jarak tempuh, serta jarak ke titik kecelakaan.
-      </p>
-      <div class="analysis-controls">
-        <div class="control-row">
-          <button id="setReferenceBtn" class="primary-btn small">Pilih Titik Referensi</button>
-          <button id="setDestinationBtn" class="secondary-btn small">Pilih Titik Tujuan</button>
-        </div>
-        <div class="control-row">
-          <button id="nearestBtn" class="secondary-btn small" disabled>Cari Titik Terdekat</button>
-          <button id="distanceBtn" class="secondary-btn small" disabled>Hitung Jarak Tempuh</button>
-        </div>
-        <div class="control-row">
-          <div class="radius-control">
-            <label for="radiusInput">Radius (km)</label>
-            <div class="radius-input">
-              <input type="number" id="radiusInput" min="0.1" step="0.1" value="2" />
-              <button id="radiusBtn" class="secondary-btn small" disabled>Titik Dalam Radius</button>
+        <div class="panel-content">
+          <p style="color:var(--text-muted); font-size:14px; margin-bottom:24px;">
+            Sistem Informasi Geografis untuk pemetaan dan analisis daerah rawan kecelakaan. Gunakan menu navigasi untuk
+            mengakses fitur analisis.
+          </p>
+
+          <div class="control-group">
+            <span class="control-label">Ringkasan Sistem</span>
+            <div class="row">
+              <div class="info-box">
+                <span class="ib-label">Total Data</span>
+                <span class="ib-value" id="stats-total">-</span>
+              </div>
+              <div class="info-box">
+                <span class="ib-label">Incident TomTom</span>
+                <span class="ib-value" id="stats-tomtom">-</span>
+              </div>
             </div>
           </div>
+
+          <div class="control-group">
+            <span class="control-label">Aksi Cepat</span>
+            <button id="addReportBtnMain" class="btn btn-primary">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              Lapor Kejadian Baru
+            </button>
+          </div>
+
         </div>
-        <button id="clearAnalysisBtn" class="danger-btn small full-width" disabled>Reset Analisis</button>
       </div>
-      <div id="analysis-results" class="analysis-results">
-        <p>Set penanda referensi untuk memulai analisis spasial.</p>
+
+      <!-- Analysis Content -->
+      <div id="panel-analysis" class="panel-view hidden">
+        <div class="panel-header">
+          <h2 class="panel-title">Analisis Spasial</h2>
+          <p class="panel-subtitle">Perhitungan jarak dan radius blackspot</p>
+        </div>
+        <div class="panel-content">
+
+          <div class="control-group">
+            <span class="control-label">1. Tentukan Titik</span>
+            <div class="row">
+              <button id="setReferenceBtn" class="btn btn-primary">Titik Acuan</button>
+              <button id="setDestinationBtn" class="btn btn-secondary">Titik Tujuan</button>
+            </div>
+            <p id="analysis-instruction" style="font-size:12px; color:var(--text-muted); margin-top:8px;">Klik tombol
+              lalu klik pada peta.</p>
+          </div>
+
+          <div class="control-group">
+            <span class="control-label">2. Operasi</span>
+            <div class="row">
+              <button id="nearestBtn" class="btn btn-secondary" disabled>Cari Terdekat</button>
+              <button id="distanceBtn" class="btn btn-secondary" disabled>Cek Jarak</button>
+            </div>
+            <div style="margin-top:12px;">
+              <span class="control-label" style="margin-bottom:6px;">Radius (KM)</span>
+              <div style="display:flex; gap:8px;">
+                <input type="number" id="radiusInput" value="2" step="0.5" style="width:80px;">
+                <button id="radiusBtn" class="btn btn-secondary" disabled style="flex:1;">Scan Radius</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <button id="clearAnalysisBtn" class="btn btn-danger" disabled>Reset Analisis</button>
+          </div>
+
+          <div class="control-group">
+            <span class="control-label">Hasil Analisis</span>
+            <div id="analysis-results" style="font-size:13px; color:var(--text-muted);">
+              Belum ada analisis yang dijalankan.
+            </div>
+          </div>
+
+        </div>
       </div>
+
+      <!-- Layers Content (Dummy placeholder layout) -->
+      <div id="panel-layers" class="panel-view hidden">
+        <div class="panel-header">
+          <h2 class="panel-title">Manajemen Layer</h2>
+          <p class="panel-subtitle">Atur visibilitas data peta</p>
+        </div>
+        <div class="panel-content">
+          <div id="custom-layer-control">
+            <!-- Leaflet default control will be styled, or we could move it here customly -->
+            <p style="font-size:13px; color:var(--text-muted);">Gunakan kontrol layer di pojok kanan atas peta untuk
+              mengganti base map dan overlay.</p>
+            <button id="refreshTrafficBtn" class="btn btn-secondary small" style="margin-top:16px;">
+              🔄 Refresh TomTom Traffic
+            </button>
+          </div>
+        </div>
+      </div>
+
     </aside>
+
+    <!-- Detail Drawer (Right) -->
+    <aside id="detailDrawer" class="detail-drawer glass-panel clickable">
+
+      <div class="detail-header-img">
+        <button onclick="closeDetail()"
+          style="position:absolute; top:12px; right:12px; background:rgba(0,0,0,0.3); border:none; border-radius:50%; width:32px; height:32px; color:fff; cursor:pointer;">✕</button>
+        <div class="detail-header-content">
+          <span class="detail-tag" id="detail-type">KECELAKAAN</span>
+          <h2 style="margin:8px 0 0; color:white; text-shadow:0 2px 4px rgba(0,0,0,0.5);" id="detail-title">Nama Lokasi
+          </h2>
+        </div>
+      </div>
+
+      <div class="panel-content">
+        <div class="info-grid">
+          <div class="info-box">
+            <span class="ib-label">Waktu Kejadian</span>
+            <span class="ib-value" id="detail-time">-</span>
+          </div>
+          <div class="info-box">
+            <span class="ib-label">Korban Jiwa</span>
+            <span class="ib-value" id="detail-victim">-</span>
+          </div>
+        </div>
+
+        <div style="margin-top:24px;">
+          <span class="control-label">Keterangan</span>
+          <p style="font-size:14px; line-height:1.6; color:var(--text-muted);" id="detail-desc">
+            Tidak ada keterangan tambahan untuk lokasi ini.
+          </p>
+        </div>
+
+        <div style="margin-top:auto; padding-top:24px; display:flex; gap:12px;">
+          <button id="deleteReportBtn" class="btn btn-danger hidden">Hapus Laporan</button>
+        </div>
+      </div>
+
+    </aside>
+
   </div>
 
-  <!-- Leaflet & Turf JS -->
+  <!-- Scripts -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
-  <!-- Leaflet Heat Plugin -->
   <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
 
   <script>
-    // ===============================
-    // INISIALISASI MAP & BASE LAYER
-    // ===============================
+    // --- UI Logic ---
+    function switchPanel(panelId) {
+      // Nav states
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      if (panelId === 'home') document.getElementById('navHome').classList.add('active');
+      if (panelId === 'analysis') document.getElementById('navAnalysis').classList.add('active');
+      if (panelId === 'layers') document.getElementById('navLayers').classList.add('active');
+
+      // Panel visibility
+      document.querySelectorAll('.panel-view').forEach(p => p.classList.add('hidden'));
+      document.getElementById('panel-' + panelId).classList.remove('hidden');
+
+      // Open drawer
+      const drawer = document.getElementById('mainPanel');
+      if (!drawer.classList.contains('open')) drawer.classList.add('open');
+    }
+
+    function closeDetail() {
+      document.getElementById('detailDrawer').classList.remove('open');
+    }
+
+    function openDetail() {
+      document.getElementById('detailDrawer').classList.add('open');
+    }
+
+    // Initialize UI
+    setTimeout(() => document.getElementById('mainPanel').classList.add('open'), 500);
+
+    // --- MAP & GIS Logic (Ported from Original) ---
+
     var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
-      attribution: '© OpenStreetMap contributors'
+      attribution: '© OpenStreetMap'
     });
 
     var satellite = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
       maxZoom: 20,
-      subdomains:['mt0','mt1','mt2','mt3'],
+      subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
       attribution: '© Google Satellite'
     });
+
+    // Dark Map Style for modern look (using CartoDB DarkMatter as alternative base if wanted, keeping OSM for now but stylized via CSS opacity is option. Let's stick to standard tiles but map container has bg)
 
     var map = L.map('map', {
       center: [-6.9241, 106.9284],
       zoom: 11,
-      layers: [osm] // default layer
+      zoomControl: false, // Reposition zoom later
+      layers: [osm]
     });
+
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
 
     var redIcon = L.icon({
       iconUrl: 'https://cdn-icons-png.flaticon.com/512/484/484167.png',
@@ -206,13 +277,9 @@
     var markerLayer = L.layerGroup();
     var userReportLayer = L.layerGroup();
     var trafficIncidentLayer = L.layerGroup();
-    var heatmapLayer = null; // Heatmap GeoAI layer
-    var userReportIndex = {}; // _id -> marker
-    var cachedBlackspotData = null; // Simpan data blackspot untuk refresh heatmap
-    var analysisMarker = null;
-    var destinationMarker = null;
-    var analysisLine = null;
-    var analysisCircle = null;
+    var heatmapLayer = null;
+
+    // Analysis State
     var analysisState = {
       mode: null,
       reference: null,
@@ -220,1053 +287,336 @@
       blackspotFC: turf.featureCollection([]),
       features: []
     };
-    var referenceIcon = L.icon({
-      iconUrl: 'https://cdn-icons-png.flaticon.com/512/854/854878.png',
-      iconSize: [32, 32],
-      iconAnchor: [16, 32]
-    });
-    var destinationIcon = L.icon({
-      iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
-      iconSize: [28, 28],
-      iconAnchor: [14, 28]
-    });
-    var highlightIcon = L.icon({
-      iconUrl: 'https://cdn-icons-png.flaticon.com/512/484/484167.png',
-      iconSize: [40, 40],
-      iconAnchor: [20, 40]
-    });
-    var trafficIncidentIcon = L.icon({
-      iconUrl: 'https://cdn-icons-png.flaticon.com/512/1828/1828843.png',
-      iconSize: [28, 28],
-      iconAnchor: [14, 28],
-      popupAnchor: [0, -25]
-    });
-    var featureMarkerMap = {};
-    var highlightedMarkerState = { marker: null, icon: null };
-    var radiusIndicators = [];
-    var nearestLine = null;
-    function rebuildAnalysisCollection() {
-      analysisState.blackspotFC = turf.featureCollection(analysisState.features.slice());
-    }
 
-    function setAnalysisFeatures(features) {
-      analysisState.features = features.slice();
-      rebuildAnalysisCollection();
-    }
+    var analysisMarker, destinationMarker, analysisLine, analysisCircle, nearestLine;
 
-    function upsertAnalysisFeature(feature) {
-      var uid = ensureFeatureId(feature);
-      var idx = analysisState.features.findIndex(function(existing) {
-        return ensureFeatureId(existing) === uid;
-      });
-      if (idx > -1) {
-        analysisState.features[idx] = feature;
-      } else {
-        analysisState.features.push(feature);
-      }
-      rebuildAnalysisCollection();
-    }
+    var featureMarkerMap = {}; // uid -> marker
 
-    function removeAnalysisFeature(uid) {
-      if (!uid) return;
-      analysisState.features = analysisState.features.filter(function(feature) {
-        return ensureFeatureId(feature) !== uid;
-      });
-      rebuildAnalysisCollection();
-    }
+    // --- Helper Functions ---
 
-    function ensureFeatureId(feature) {
-      if (!feature.properties) feature.properties = {};
-      if (!feature.properties._uid) {
-        var existing = feature.properties._id;
-        feature.properties._uid = existing || ('feat_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8));
-      }
-      return feature.properties._uid;
-    }
-
-    function registerMarker(feature, marker) {
-      var uid = ensureFeatureId(feature);
-      featureMarkerMap[uid] = marker;
-      marker.__featureUid = uid;
-      marker.__baseIcon = marker.__baseIcon || marker.options.icon;
-    }
-
-    function getMarkerByFeature(feature) {
-      if (!feature || !feature.properties) return null;
-      var uid = ensureFeatureId(feature);
-      return featureMarkerMap[uid] || null;
-    }
-
-    function clearHighlightedMarker() {
-      if (highlightedMarkerState.marker) {
-        highlightedMarkerState.marker.setIcon(highlightedMarkerState.icon || highlightedMarkerState.marker.__baseIcon || redIcon);
-        highlightedMarkerState.marker = null;
-        highlightedMarkerState.icon = null;
-      }
-    }
-
-    function highlightFeatureMarker(feature) {
-      clearHighlightedMarker();
-      var marker = getMarkerByFeature(feature);
-      if (!marker) return;
-      highlightedMarkerState.marker = marker;
-      highlightedMarkerState.icon = marker.options.icon;
-      marker.setIcon(highlightIcon);
-      if (marker.getTooltip()) {
-        marker.openTooltip();
-      }
-    }
-
-    function clearRadiusIndicators() {
-      radiusIndicators.forEach(function(popup) {
-        map.removeLayer(popup);
-      });
-      radiusIndicators = [];
-    }
-
-    function showRadiusIndicators(features) {
-      clearRadiusIndicators();
-      features.forEach(function(feature) {
-        var marker = getMarkerByFeature(feature);
-        if (!marker) return;
-        var popup = L.popup({
-          closeButton: false,
-          autoClose: false,
-          closeOnClick: false,
-          className: 'radius-popup'
-        }).setLatLng(marker.getLatLng())
-          .setContent('<strong>Masuk radius</strong><br>' + (feature.properties.nama || 'Titik'));
-        popup.addTo(map);
-        radiusIndicators.push(popup);
-      });
+    function updateStats() {
+      // Simple stats update
+      var count = analysisState.features.length;
+      document.getElementById('stats-total').innerText = count + " Lokasi";
     }
 
     function setAnalysisMessage(html) {
       document.getElementById('analysis-results').innerHTML = html;
     }
 
-    function activateButtons(state) {
-      document.getElementById('nearestBtn').disabled = !state.reference;
-      document.getElementById('radiusBtn').disabled = !state.reference;
-      document.getElementById('distanceBtn').disabled = !(state.reference && state.destination);
-      document.getElementById('setDestinationBtn').disabled = !state.reference;
-      document.getElementById('clearAnalysisBtn').disabled = !!(state.reference || state.destination);
+    function activateButtons() {
+      const s = analysisState;
+      document.getElementById('nearestBtn').disabled = !s.reference;
+      document.getElementById('radiusBtn').disabled = !s.reference;
+      document.getElementById('distanceBtn').disabled = !(s.reference && s.destination);
+      document.getElementById('setDestinationBtn').disabled = !s.reference;
+      document.getElementById('clearAnalysisBtn').disabled = !(s.reference || s.destination);
     }
+
+    // --- Detail Drawer Logic ---
+    var activeFeatureId = null;
+
+    function updateDetailDrawer(feature) {
+      const p = feature.properties || {};
+
+      document.getElementById('detail-title').innerText = p.nama || 'Lokasi Tanpa Nama';
+      document.getElementById('detail-type').innerText = (p.kecelakaan || 'Info').toUpperCase();
+
+      // Parse more info
+      document.getElementById('detail-time').innerText = p.waktu || '-';
+      document.getElementById('detail-victim').innerText = p.korban || '-';
+
+      const coords = feature.geometry.coordinates;
+      const coordText = coords ? coords[1].toFixed(5) + ', ' + coords[0].toFixed(5) : '-';
+
+      document.getElementById('detail-desc').innerHTML = `
+         <strong>Koordinat:</strong> ${coordText}<br><br>
+         Data ini tercatat dalam sistem informasi geografis blackspot.
+       `;
+
+      // User report handling
+      const delBtn = document.getElementById('deleteReportBtn');
+      if (p._user && p._id) {
+        activeFeatureId = p._id;
+        delBtn.classList.remove('hidden');
+        delBtn.onclick = () => deleteUserReport(p._id);
+      } else {
+        activeFeatureId = null;
+        delBtn.classList.add('hidden');
+      }
+
+      openDetail();
+    }
+
+    // --- Analysis Functions ---
 
     function setReferencePoint(latlng) {
       if (analysisMarker) map.removeLayer(analysisMarker);
-      analysisMarker = L.marker(latlng, { icon: referenceIcon, draggable: true }).addTo(map);
-      analysisMarker.on('dragend', function(e) {
-        var newLatLng = e.target.getLatLng();
-        analysisState.reference = turf.point([newLatLng.lng, newLatLng.lat]);
-        updateAnalysisArtifacts();
+      analysisMarker = L.marker(latlng, { draggable: true }).addTo(map).bindTooltip("Titik Acuan").openTooltip();
+
+      analysisMarker.on('dragend', function (e) {
+        analysisState.reference = turf.point([e.target.getLatLng().lng, e.target.getLatLng().lat]);
+        activateButtons();
       });
+
       analysisState.reference = turf.point([latlng.lng, latlng.lat]);
-      updateAnalysisArtifacts();
+      activateButtons();
+      setAnalysisMessage('<span style="color:var(--success)">Titik acuan ditetapkan.</span> Pilih operasi analisis.');
+
+      // Auto switch to analysis panel if not open
+      switchPanel('analysis');
     }
 
-    function setDestinationPoint(latlng, feature) {
+    function setDestinationPoint(latlng) {
       if (destinationMarker) map.removeLayer(destinationMarker);
-      destinationMarker = L.marker(latlng, { icon: destinationIcon, draggable: true }).addTo(map);
-      destinationMarker.on('dragend', function(e) {
-        var newLatLng = e.target.getLatLng();
-        analysisState.destination = turf.point([newLatLng.lng, newLatLng.lat]);
+      destinationMarker = L.marker(latlng, { draggable: true }).addTo(map).bindTooltip("Tujuan").openTooltip();
+
+      destinationMarker.on('dragend', function (e) {
+        analysisState.destination = turf.point([e.target.getLatLng().lng, e.target.getLatLng().lat]);
         drawDistanceLine();
       });
-      analysisState.destination = turf.point([latlng.lng, latlng.lat]);
-      if (nearestLine) {
-        map.removeLayer(nearestLine);
-        nearestLine = null;
-      }
-      drawDistanceLine();
-      if (feature) {
-        highlightFeatureMarker(feature);
-      }
-    }
 
-    function updateAnalysisArtifacts() {
-      if (analysisCircle) {
-        map.removeLayer(analysisCircle);
-        analysisCircle = null;
-      }
-      if (analysisLine) {
-        map.removeLayer(analysisLine);
-        analysisLine = null;
-      }
-      if (nearestLine) {
-        map.removeLayer(nearestLine);
-        nearestLine = null;
-      }
-      clearRadiusIndicators();
-      clearHighlightedMarker();
-      analysisState.destination = null;
-      if (destinationMarker) {
-        map.removeLayer(destinationMarker);
-        destinationMarker = null;
-      }
-      activateButtons(analysisState);
-      setAnalysisMessage('<p>Penanda referensi tersimpan. Silakan jalankan analisis.</p>');
+      analysisState.destination = turf.point([latlng.lng, latlng.lat]);
+      drawDistanceLine();
     }
 
     function drawDistanceLine() {
-      if (analysisLine) {
-        map.removeLayer(analysisLine);
+      if (analysisLine) map.removeLayer(analysisLine);
+      if (nearestLine) map.removeLayer(nearestLine);
+
+      if (analysisState.reference && analysisState.destination) {
+        var from = analysisState.reference.geometry.coordinates;
+        var to = analysisState.destination.geometry.coordinates;
+
+        analysisLine = L.polyline([[from[1], from[0]], [to[1], to[0]]], {
+          color: '#f59e0b', weight: 4, dashArray: '10,10'
+        }).addTo(map);
+
+        var d = turf.distance(analysisState.reference, analysisState.destination, { units: 'kilometers' }).toFixed(2);
+        setAnalysisMessage(`Jarak lurus: <strong style="color:white; font-size:16px;">${d} KM</strong>`);
+        activateButtons();
       }
-      if (!(analysisState.reference && analysisState.destination)) {
-        activateButtons(analysisState);
-        return;
-      }
-      var start = analysisState.reference.geometry.coordinates;
-      var end = analysisState.destination.geometry.coordinates;
-      analysisLine = L.polyline([[start[1], start[0]], [end[1], end[0]]], {
-        color: '#f97316',
-        dashArray: '8,6',
-        weight: 4
-      }).addTo(map);
-      activateButtons(analysisState);
     }
 
-    function handleAnalysisClick(e) {
-      if (!analysisState.mode) return;
-      if (analysisState.mode === 'reference') {
-        setReferencePoint(e.latlng);
-        setAnalysisMessage('<p>Penanda referensi ditetapkan dari klik peta.</p>');
-      } else if (analysisState.mode === 'destination') {
-        setDestinationPoint(e.latlng);
-        setAnalysisMessage('<p>Tujuan ditetapkan dari klik peta. Jalankan perhitungan jarak.</p>');
-      }
-      analysisState.mode = null;
-      map.getContainer().style.cursor = '';
-    }
+    function runNearest() {
+      if (!analysisState.reference || analysisState.features.length === 0) return;
 
-    function promptRadius() {
-      var radiusInput = document.getElementById('radiusInput');
-      var value = parseFloat(radiusInput.value);
-      if (Number.isNaN(value) || value <= 0) {
-        alert('Radius harus berupa angka lebih dari 0');
-        return null;
-      }
-      return value;
-    }
-
-    function runNearestAnalysis() {
-      if (!(analysisState.reference && analysisState.blackspotFC && analysisState.blackspotFC.features.length)) {
-        setAnalysisMessage('<p>Data belum lengkap untuk analisis.</p>');
-        return;
-      }
       var nearest = turf.nearestPoint(analysisState.reference, analysisState.blackspotFC);
-      if (!nearest) {
-        setAnalysisMessage('<p>Tidak ada titik blackspot.</p>');
-        return;
+      if (nearest) {
+        var c = nearest.geometry.coordinates;
+        if (nearestLine) map.removeLayer(nearestLine);
+
+        var refC = analysisState.reference.geometry.coordinates;
+        nearestLine = L.polyline([[refC[1], refC[0]], [c[1], c[0]]], { color: '#ef4444', weight: 4 }).addTo(map);
+
+        var d = turf.distance(analysisState.reference, nearest, { units: 'kilometers' }).toFixed(2);
+        setAnalysisMessage(`Titik Terdekat: <strong>${nearest.properties.nama}</strong> (${d} KM)`);
+        map.setView([c[1], c[0]], 14);
+        updateDetailDrawer(nearest);
       }
-      var distance = turf.distance(analysisState.reference, nearest, { units: 'kilometers' }).toFixed(2);
-      var coords = nearest.geometry.coordinates;
-      setAnalysisMessage(`
-        <p><strong>Titik terdekat</strong>: ${nearest.properties.nama || 'Tanpa nama'}.</p>
-        <p>Jarak: ${distance} km.</p>
-        <p>Koordinat: ${coords[1].toFixed(5)}, ${coords[0].toFixed(5)}</p>
-      `);
-      clearRadiusIndicators();
-      if (nearestLine) {
-        map.removeLayer(nearestLine);
-      }
-      nearestLine = L.polyline([
-        [analysisState.reference.geometry.coordinates[1], analysisState.reference.geometry.coordinates[0]],
-        [coords[1], coords[0]]
-      ], {
-        color: '#f43f5e',
-        weight: 4,
-        dashArray: '6,4'
-      }).addTo(map);
-      highlightFeatureMarker(nearest);
-      map.setView([coords[1], coords[0]], 14);
     }
 
-    function runRadiusAnalysis() {
-      var radius = promptRadius();
-      if (!radius || !analysisState.reference || !analysisState.blackspotFC || !analysisState.blackspotFC.features.length) {
-        setAnalysisMessage('<p>Data belum lengkap untuk analisis radius.</p>');
-        return;
-      }
+    function runRadius() {
+      var r = parseFloat(document.getElementById('radiusInput').value);
+      if (!r || !analysisState.reference) return;
+
       if (analysisCircle) map.removeLayer(analysisCircle);
-      analysisCircle = L.circle([analysisState.reference.geometry.coordinates[1], analysisState.reference.geometry.coordinates[0]], {
-        radius: radius * 1000,
-        color: '#10b981',
-        fillColor: '#10b981',
-        fillOpacity: 0.15
-      }).addTo(map);
-      var within = analysisState.blackspotFC.features.filter(function(feature) {
-        var dist = turf.distance(analysisState.reference, feature, { units: 'kilometers' });
-        return dist <= radius;
+      var center = analysisState.reference.geometry.coordinates;
+      analysisCircle = L.circle([center[1], center[0]], { radius: r * 1000, color: '#10b981' }).addTo(map);
+
+      var within = analysisState.blackspotFC.features.filter(f => {
+        return turf.distance(analysisState.reference, f, { units: 'kilometers' }) <= r;
       });
-      if (!within.length) {
-        setAnalysisMessage(`<p>Tidak ada titik dalam radius ${radius} km.</p>`);
-        return;
-      }
-      clearHighlightedMarker();
-      var listItems = within.map(function(feature) {
-        var d = turf.distance(analysisState.reference, feature, { units: 'kilometers' }).toFixed(2);
-        return `<li>${feature.properties.nama || 'Tanpa nama'} - ${d} km</li>`;
-      }).join('');
-      showRadiusIndicators(within);
-      setAnalysisMessage(`
-        <p><strong>${within.length}</strong> titik dalam radius ${radius} km:</p>
-        <ul>${listItems}</ul>
-      `);
-    }
 
-    function runDistanceAnalysis() {
-      if (!(analysisState.reference && analysisState.destination)) {
-        setAnalysisMessage('<p>Pilih titik referensi dan tujuan terlebih dahulu.</p>');
-        return;
-      }
-      var distance = turf.distance(analysisState.reference, analysisState.destination, { units: 'kilometers' }).toFixed(2);
-      setAnalysisMessage(`
-        <p>Jarak tempuh garis lurus antara referensi dan tujuan: <strong>${distance} km</strong>.</p>
-        <p>Dongkrak ketelitian dengan memindahkan marker menggunakan drag & drop.</p>
-      `);
-    }
-
-    function reportDistanceToFeature(feature) {
-      if (!analysisState.reference || !feature || !feature.geometry) return;
-      var dist = turf.distance(analysisState.reference, feature, { units: 'kilometers' }).toFixed(2);
-      var message = `
-        <p>Jarak penanda referensi ke <strong>${feature.properties.nama || 'titik'}</strong> adalah ${dist} km.</p>
-      `;
-      setAnalysisMessage(message);
+      setAnalysisMessage(`Ditemukan <strong>${within.length}</strong> titik dalam radius ${r} KM.`);
     }
 
     function clearAnalysis() {
-      if (analysisMarker) { map.removeLayer(analysisMarker); analysisMarker = null; }
-      if (destinationMarker) { map.removeLayer(destinationMarker); destinationMarker = null; }
-      if (analysisLine) { map.removeLayer(analysisLine); analysisLine = null; }
-      if (nearestLine) { map.removeLayer(nearestLine); nearestLine = null; }
-      if (analysisCircle) { map.removeLayer(analysisCircle); analysisCircle = null; }
+      if (analysisMarker) map.removeLayer(analysisMarker);
+      if (destinationMarker) map.removeLayer(destinationMarker);
+      if (analysisLine) map.removeLayer(analysisLine);
+      if (analysisCircle) map.removeLayer(analysisCircle);
+      if (nearestLine) map.removeLayer(nearestLine);
+
       analysisState.reference = null;
       analysisState.destination = null;
-      analysisState.mode = null;
-      map.getContainer().style.cursor = '';
-      clearRadiusIndicators();
-      clearHighlightedMarker();
-      activateButtons(analysisState);
-      setAnalysisMessage('<p>Set penanda referensi untuk memulai analisis spasial.</p>');
+      activateButtons();
+      setAnalysisMessage('Analisis di-reset.');
     }
 
-    map.on('click', handleAnalysisClick);
+    // --- Interaction Hooks ---
 
-    var referenceBtn = document.getElementById('setReferenceBtn');
-    var destinationBtn = document.getElementById('setDestinationBtn');
-    var nearestBtn = document.getElementById('nearestBtn');
-    var radiusBtn = document.getElementById('radiusBtn');
-    var distanceBtn = document.getElementById('distanceBtn');
-    var clearBtn = document.getElementById('clearAnalysisBtn');
-    activateButtons(analysisState);
-
-    referenceBtn.addEventListener('click', function() {
-      analysisState.mode = 'reference';
-      map.getContainer().style.cursor = 'crosshair';
-      setAnalysisMessage('<p>Klik di peta untuk menetapkan penanda referensi.</p>');
-    });
-
-    destinationBtn.addEventListener('click', function() {
-      if (!analysisState.reference) {
-        alert('Tetapkan penanda referensi terlebih dahulu.');
+    map.on('click', function (e) {
+      if (analysisState.mode === 'reference') {
+        setReferencePoint(e.latlng);
+        analysisState.mode = null;
+        document.getElementById('map').style.cursor = '';
         return;
       }
-      analysisState.mode = 'destination';
-      map.getContainer().style.cursor = 'crosshair';
-      setAnalysisMessage('<p>Klik lokasi tujuan di peta.</p>');
+      if (analysisState.mode === 'destination') {
+        setDestinationPoint(e.latlng);
+        analysisState.mode = null;
+        document.getElementById('map').style.cursor = '';
+        return;
+      }
+      if (analysisState.mode === 'report') {
+        handleAddReportClick(e.latlng);
+        analysisState.mode = null;
+        document.getElementById('map').style.cursor = '';
+        return;
+      }
+      // Normal click... close details maybe?
+      // closeDetail();
     });
 
-    nearestBtn.addEventListener('click', runNearestAnalysis);
-    radiusBtn.addEventListener('click', runRadiusAnalysis);
-    distanceBtn.addEventListener('click', runDistanceAnalysis);
-    clearBtn.addEventListener('click', clearAnalysis);
+    document.getElementById('setReferenceBtn').onclick = () => {
+      analysisState.mode = 'reference';
+      document.getElementById('map').style.cursor = 'crosshair';
+      setAnalysisMessage('Klik lokasi di peta untuk titik acuan.');
+    };
 
-    // ===============================
-    // UTIL: RENDER & STORAGE LAPORAN PENGGUNA
-    // ===============================
-    function featureToMarker(feature, latlngOverride) {
-      var coords = feature.geometry && feature.geometry.coordinates;
-      if (!coords || coords.length < 2) return null;
-      var latlng = latlngOverride || L.latLng(coords[1], coords[0]);
-      var marker = L.marker(latlng, { icon: redIcon });
-      registerMarker(feature, marker);
-      var name = (feature.properties && feature.properties.nama) || 'Laporan Pengguna';
-      marker.bindTooltip(name);
-      marker.on('click', function() {
-        if (analysisState.mode === 'reference') {
-          setReferencePoint(marker.getLatLng());
-          analysisState.mode = null;
-          map.getContainer().style.cursor = '';
-          setAnalysisMessage('<p>Penanda referensi diambil dari marker.</p>');
-          return;
-        }
-        if (analysisState.mode === 'destination') {
-          setDestinationPoint(marker.getLatLng(), feature);
-          analysisState.mode = null;
-          map.getContainer().style.cursor = '';
-          setAnalysisMessage('<p>Titik tujuan diambil dari marker terpilih.</p>');
-          return;
-        }
-        updateSidebar(feature);
-        map.setView(latlng, 14);
-        reportDistanceToFeature(feature);
+    document.getElementById('setDestinationBtn').onclick = () => {
+      analysisState.mode = 'destination';
+      document.getElementById('map').style.cursor = 'crosshair';
+      setAnalysisMessage('Klik lokasi di peta untuk titik tujuan.');
+    };
+
+    document.getElementById('nearestBtn').onclick = runNearest;
+    document.getElementById('distanceBtn').onclick = drawDistanceLine; // re-run
+    document.getElementById('radiusBtn').onclick = runRadius;
+    document.getElementById('clearAnalysisBtn').onclick = clearAnalysis;
+
+    // --- Reporting System ---
+
+    document.getElementById('addReportBtnMain').onclick = () => {
+      analysisState.mode = 'report';
+      document.getElementById('map').style.cursor = 'crosshair';
+      alert("Klik lokasi di peta untuk menambahkan laporan baru.");
+    };
+
+    function handleAddReportClick(latlng) {
+      var nama = prompt('Nama lokasi/kejadian:', 'Laporan Baru');
+      if (!nama) return;
+      var jenis = prompt('Jenis kejadian:', 'Kecelakaan');
+      var korban = prompt('Korban:', '0 Luka');
+      var waktu = new Date().toLocaleString();
+
+      var feature = {
+        type: 'Feature',
+        properties: {
+          nama: nama, kecelakaan: jenis, korban: korban, waktu: waktu,
+          _id: 'rep_' + Date.now(), _user: true
+        },
+        geometry: { type: 'Point', coordinates: [latlng.lng, latlng.lat] }
+      };
+
+      addFeatureToMap(feature);
+      saveUserReport(feature);
+      updateDetailDrawer(feature);
+      updateStats();
+    }
+
+    function addFeatureToMap(feature) {
+      // Register feature
+      analysisState.features.push(feature);
+      analysisState.blackspotFC = turf.featureCollection(analysisState.features);
+
+      var latlng = [feature.geometry.coordinates[1], feature.geometry.coordinates[0]];
+      var icon = feature.properties._user ? redIcon : redIcon; // Can customize icon
+
+      var marker = L.marker(latlng, { icon: icon }).addTo(feature.properties._user ? userReportLayer : markerLayer);
+      marker.bindTooltip(feature.properties.nama);
+      marker.on('click', () => {
+        updateDetailDrawer(feature);
+        map.setView(latlng, 15);
       });
-      return marker;
-    }
-
-    function addUserReportFeature(feature) {
-      ensureFeatureId(feature);
-      if (!feature.properties) feature.properties = {};
-      if (!feature.properties._id) {
-        feature.properties._id = 'rep_' + Date.now().toString(36) + Math.random().toString(36).slice(2,8);
-      }
-      feature.properties._user = true;
-      var marker = featureToMarker(feature);
-      if (marker) {
-        marker.addTo(userReportLayer);
-        userReportIndex[feature.properties._id] = marker;
-        upsertAnalysisFeature(feature);
-      }
-    }
-
-    function loadUserReports() {
-      try {
-        var raw = localStorage.getItem('userReports');
-        if (!raw) return;
-        var geojson = JSON.parse(raw);
-        if (!geojson || !Array.isArray(geojson.features)) return;
-        geojson.features.forEach(addUserReportFeature);
-      } catch (e) {
-        console.warn('Gagal memuat laporan pengguna dari localStorage', e);
-      }
     }
 
     function saveUserReport(feature) {
-      ensureFeatureId(feature);
-      var collection = { type: 'FeatureCollection', features: [] };
-      try {
-        var raw = localStorage.getItem('userReports');
-        if (raw) {
-          var parsed = JSON.parse(raw);
-          if (parsed && Array.isArray(parsed.features)) collection.features = parsed.features;
-        }
-      } catch (e) {
-        // mulai koleksi baru jika parsing gagal
-      }
-      if (!feature.properties) feature.properties = {};
-      if (!feature.properties._id) {
-        feature.properties._id = 'rep_' + Date.now().toString(36) + Math.random().toString(36).slice(2,8);
-      }
-      feature.properties._user = true;
-      collection.features.push(feature);
-      localStorage.setItem('userReports', JSON.stringify(collection));
+      var reports = JSON.parse(localStorage.getItem('userReports') || '{"type":"FeatureCollection","features":[]}');
+      reports.features.push(feature);
+      localStorage.setItem('userReports', JSON.stringify(reports));
     }
 
-    function updateSidebar(feature) {
-      var props = feature.properties || {};
-      var container = document.getElementById('sidebar-content');
-      container.innerHTML = `
-        <div class="info-card">
-          <h3 class="info-title">${props.nama || 'Lokasi Tanpa Nama'}</h3>
-          <div class="summary">
-            <div class="summary-item"><div class="summary-label">Jenis</div><div class="summary-value">${(props.kecelakaan || '-').split(' ')[0]}</div></div>
-            <div class="summary-item"><div class="summary-label">Korban</div><div class="summary-value">${props.korban ? props.korban.split(',')[0] : '-'}</div></div>
-            <div class="summary-item"><div class="summary-label">Waktu</div><div class="summary-value">${props.waktu ? props.waktu.split(',')[0] : '-'}</div></div>
-          </div>
-          <div class="kv">
-            <div class="kv-row"><span class="kv-label">Jenis Kejadian</span><span class="kv-value">${props.kecelakaan || '-'}</span></div>
-            <div class="kv-row"><span class="kv-label">Korban</span><span class="kv-value">${props.korban || '-'}</span></div>
-            <div class="kv-row"><span class="kv-label">Waktu</span><span class="kv-value">${props.waktu || '-'}</span></div>
-            <div class="kv-row"><span class="kv-label">Koordinat</span><span class="kv-value">${(feature.geometry && feature.geometry.coordinates) ? feature.geometry.coordinates[1].toFixed(5) + ', ' + feature.geometry.coordinates[0].toFixed(5) : '-'}</span></div>
-          </div>
-          <div class="divider"></div>
-          <p class="muted">Ringkasan lokasi blackspot. Pilih titik lain di peta untuk melihat detail berbeda.</p>
-        </div>
-      `;
-      var reportBtn = document.getElementById('reportBtn');
-      var deleteBtn = document.getElementById('deleteBtn');
-      reportBtn.disabled = false;
-      reportBtn.innerHTML = '\n        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 5v14M5 12h14" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>\n        Tambah Laporan\n      ';
-      // Atur tombol Hapus: hanya aktif untuk laporan pengguna
-      if (props._user && props._id) {
-        deleteBtn.disabled = false;
-        deleteBtn.innerHTML = '\n        Hapus Laporan\n      ';
-        deleteBtn.onclick = function() {
-          if (!confirm('Hapus laporan ini?')) return;
-          try {
-            var raw = localStorage.getItem('userReports');
-            var collection = raw ? JSON.parse(raw) : { type: 'FeatureCollection', features: [] };
-            collection.features = (collection.features || []).filter(function(f) {
-              return !(f && f.properties && f.properties._id === props._id);
-            });
-            localStorage.setItem('userReports', JSON.stringify(collection));
+    function deleteUserReport(id) {
+      if (!confirm("Hapus laporan ini?")) return;
 
-            // Hapus marker dari peta jika ada
-            var marker = userReportIndex[props._id];
-            if (marker) {
-              userReportLayer.removeLayer(marker);
-              delete userReportIndex[props._id];
-            }
+      var reports = JSON.parse(localStorage.getItem('userReports') || '{"type":"FeatureCollection","features":[]}');
+      reports.features = reports.features.filter(f => f.properties._id !== id);
+      localStorage.setItem('userReports', JSON.stringify(reports));
 
-            // Perbarui heatmap setelah menghapus laporan
-            refreshHeatmap();
-
-            removeAnalysisFeature(props._uid || props._id);
-            if (highlightedMarkerState.marker && highlightedMarkerState.marker.__featureUid === (props._uid || props._id)) {
-              highlightedMarkerState.marker = null;
-              highlightedMarkerState.icon = null;
-            }
-
-            // Reset sidebar ke placeholder
-            document.getElementById('sidebar-content').innerHTML = '\n        <div class="placeholder">\n          <div class="dot"></div>\n          <p>Pilih marker pada peta untuk menampilkan ringkasan kecelakaan.</p>\n        </div>\n      ';
-            deleteBtn.disabled = true;
-          } catch (e) {
-            alert('Gagal menghapus laporan.');
-          }
-        };
-      } else {
-        deleteBtn.disabled = true;
-        deleteBtn.onclick = null;
-      }
-
-      reportBtn.onclick = function() {
-        var originalLabel = reportBtn.innerHTML;
-        reportBtn.disabled = true;
-        reportBtn.innerHTML = '\n        Pilih lokasi di peta...\n      ';
-
-        var clickOnce = function(e) {
-          map.off('click', clickOnce);
-          var latlng = e.latlng;
-          var nama = prompt('Nama lokasi/kejadian:', props.nama || 'Laporan Pengguna');
-          if (nama === null) { reportBtn.disabled = false; reportBtn.innerHTML = originalLabel; return; }
-          var jenis = prompt('Jenis kejadian (mis. Tabrakan beruntun):', props.kecelakaan || 'Kecelakaan');
-          if (jenis === null) { reportBtn.disabled = false; reportBtn.innerHTML = originalLabel; return; }
-          var korban = prompt('Korban (mis. 1 meninggal, 2 luka):', props.korban || '0 meninggal, 0 luka');
-          if (korban === null) { reportBtn.disabled = false; reportBtn.innerHTML = originalLabel; return; }
-          var waktu = prompt('Waktu (mis. 12 Nov 2025, 14:30):', props.waktu || new Date().toLocaleString());
-          if (waktu === null) { reportBtn.disabled = false; reportBtn.innerHTML = originalLabel; return; }
-
-          var feature = {
-            type: 'Feature',
-            properties: { nama: nama, kecelakaan: jenis, korban: korban, waktu: waktu },
-            geometry: { type: 'Point', coordinates: [latlng.lng, latlng.lat] }
-          };
-
-          addUserReportFeature(feature);
-          saveUserReport(feature);
-          updateSidebar(feature);
-
-          // Perbarui heatmap setelah menambah laporan baru
-          refreshHeatmap();
-
-          reportBtn.disabled = false;
-          reportBtn.innerHTML = originalLabel;
-        };
-
-        map.on('click', clickOnce);
-      };
-
-      reportDistanceToFeature(feature);
+      location.reload(); // Simple reload to refresh state cleanly
     }
 
-    // ===============================
-    // POLYLINE (JALUR JALAN UTAMA)
-    // ===============================
-    var polylineLayer = L.polyline([
-      [-6.9218, 106.9425],
-      [-6.933, 106.975],
-      [-6.941, 106.898],
-      [-6.879, 106.842],
-      [-6.823, 106.783]
-    ], {
-      color: 'blue',
-      weight: 4,
-      opacity: 0.7
-    }).bindPopup("Jalur utama penghubung antar kecamatan");
+    // --- Data Loading ---
 
-    // ===============================
-    // POLYGON (BATAS KECAMATAN DUMMY)
-    // ===============================
-    var polygonLayer = L.polygon([
-      [-6.89, 106.90],
-      [-6.92, 106.97],
-      [-6.96, 106.95],
-      [-6.94, 106.88]
-    ], {
-      color: 'green',
-      fillColor: '#00FF00',
-      fillOpacity: 0.2
-    }).bindPopup("Batas wilayah Kecamatan Sukaraja (contoh)");
+    // 1. Load LocalStorage Reports
+    try {
+      var userReports = JSON.parse(localStorage.getItem('userReports') || '{"type":"FeatureCollection","features":[]}');
+      userReports.features.forEach(addFeatureToMap);
+    } catch (e) { console.error(e); }
 
-    // ===============================
-    // KONTROL LAYER
-    // ===============================
-    var baseMaps = {
-      "OpenStreetMap": osm,
-      "Satellite": satellite
-    };
-
-    // Inisialisasi heatmap layer dengan data kosong (akan diupdate saat data GeoJSON dimuat)
-    heatmapLayer = L.heatLayer([], {
-      radius: 50,
-      blur: 30,
-      maxZoom: 17,
-      minOpacity: 0.5,
-      gradient: {
-        0.0: 'yellow',
-        0.5: 'orange',
-        1.0: 'red'
-      }
-    });
-
-    var overlayMaps = {
-      "Titik Blackspot": markerLayer,
-      "Laporan Pengguna": userReportLayer,
-      "Insiden Lalu Lintas (TomTom)": trafficIncidentLayer,
-      "GeoAI: Heatmap Kepadatan Kecelakaan": heatmapLayer,
-      "Jalur Utama": polylineLayer,
-      "Batas Kecamatan": polygonLayer
-    };
-
-    // Simpan reference ke layer control agar bisa diupdate
-    var layerControl = L.control.layers(baseMaps, overlayMaps).addTo(map);
-
-    // Default tampil semua overlay
-    markerLayer.addTo(map);
-    polylineLayer.addTo(map);
-    polygonLayer.addTo(map);
-    userReportLayer.addTo(map);
-
-    // ===============================
-    // TOMTOM TRAFFIC API INTEGRATION
-    // ===============================
-    // Utility function to escape HTML
-    function escapeHtml(text) {
-      if (!text) return '';
-      var div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
-    }
-    
-    // API key TomTom
-    var TOMTOM_API_KEY = '4CZMpEqq9NEItsBXz1h0bshCz1RArdEs';
-    
-    // Update traffic status display
-    function updateTrafficStatus(message, isError) {
-      var statusEl = document.getElementById('trafficStatus');
-      if (statusEl) {
-        statusEl.textContent = message;
-        statusEl.style.color = isError ? '#dc2626' : '#6b7280';
-      }
-    }
-    
-    function getTrafficIncidents() {
-      // Periksa apakah API key sudah diatur dengan benar
-      var apiKey = (TOMTOM_API_KEY || '').trim();
-      if (!apiKey || apiKey === '' || apiKey === 'YOUR_TOMTOM_API_KEY_HERE' || apiKey === 'YOUR_API_KEY') {
-        updateTrafficStatus('⚠️ API key belum diatur', true);
-        console.warn('TomTom API key belum diatur. Silakan set TOMTOM_API_KEY di kode dengan API key yang valid.');
-        return;
-      }
-      
-      updateTrafficStatus('Memuat insiden...', false);
-      
-      var url = 'https://api.tomtom.com/traffic/services/5/incidentDetails' +
-        '?bbox=106.27,-7.38,107.07,-6.57' +
-        '&fields={incidents{type,geometry{type,coordinates},properties{iconCategory}}}' +
-        '&language=en-GB' +
-        '&categoryFilter=1' +
-        '&timeValidityFilter=present' +
-        '&key=' + apiKey;
-      
-      fetch(url)
-        .then(function(response) {
-          if (!response.ok) {
-            throw new Error('HTTP error! status: ' + response.status);
-          }
-          return response.json();
-        })
-        .then(function(data) {
-          // Clear existing traffic incidents
-          trafficIncidentLayer.clearLayers();
-          
-          // TomTom API returns data in different formats, handle both
-          var incidents = [];
-          if (data && data.incidents && Array.isArray(data.incidents)) {
-            incidents = data.incidents;
-          } else if (data && Array.isArray(data)) {
-            incidents = data;
-          } else if (data && data.tm && data.tm.poi && Array.isArray(data.tm.poi)) {
-            incidents = data.tm.poi;
-          }
-          
-          if (incidents.length === 0) {
-            updateTrafficStatus('Tidak ada insiden ditemukan', false);
-            console.log('Tidak ada insiden lalu lintas ditemukan.');
-            return;
-          }
-          
-          var incidentCount = 0;
-          incidents.forEach(function(incident) {
-            try {
-              if (!incident.geometry || !incident.geometry.coordinates) return;
-              
-              var coords = incident.geometry.coordinates;
-              var lat, lng;
-              
-              // Handle different geometry types
-              if (incident.geometry.type === 'Point') {
-                lng = coords[0];
-                lat = coords[1];
-              } else if (incident.geometry.type === 'LineString' && Array.isArray(coords) && coords.length > 0) {
-                // Use first point of LineString
-                if (Array.isArray(coords[0])) {
-                  lng = coords[0][0];
-                  lat = coords[0][1];
-                } else {
-                  lng = coords[0];
-                  lat = coords[1];
-                }
-              } else {
-                return; // Skip if we can't determine coordinates
-              }
-              
-              // Validate coordinates
-              if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-                return;
-              }
-              
-              var incidentType = incident.type || 'Unknown';
-              var iconCategory = (incident.properties && incident.properties.iconCategory) || 
-                                 (incident.poi && incident.poi.classifications && incident.poi.classifications[0]) ||
-                                 'Unknown';
-              
-              // Get additional properties if available
-              var severity = (incident.properties && incident.properties.severity) || 
-                            (incident.poi && incident.poi.severity) || '';
-              var description = (incident.properties && incident.properties.description) || 
-                               (incident.poi && incident.poi.description) || '';
-              
-              // Create marker for incident
-              var marker = L.marker([lat, lng], { icon: trafficIncidentIcon });
-              
-              // Create popup content
-              var popupContent = '<div class="popup-content">' +
-                '<h4 style="margin: 0 0 8px; color: #dc2626;">🚨 Insiden Lalu Lintas</h4>' +
-                '<p style="margin: 4px 0;"><strong>Jenis:</strong> ' + escapeHtml(incidentType) + '</p>';
-              
-              if (iconCategory && iconCategory !== 'Unknown') {
-                popupContent += '<p style="margin: 4px 0;"><strong>Kategori:</strong> ' + escapeHtml(iconCategory) + '</p>';
-              }
-              
-              if (severity) {
-                popupContent += '<p style="margin: 4px 0;"><strong>Tingkat Keparahan:</strong> ' + escapeHtml(severity) + '</p>';
-              }
-              
-              if (description) {
-                popupContent += '<p style="margin: 4px 0;"><strong>Deskripsi:</strong> ' + escapeHtml(description) + '</p>';
-              }
-              
-              popupContent += '<p style="margin: 4px 0; font-size: 12px; color: #6b7280;">Koordinat: ' + 
-                lat.toFixed(5) + ', ' + lng.toFixed(5) + '</p>' +
-                '</div>';
-              
-              marker.bindPopup(popupContent);
-              marker.bindTooltip('Insiden: ' + incidentType);
-              
-              // Add click handler
-              marker.on('click', function() {
-                map.setView([lat, lng], 14);
-              });
-              
-              marker.addTo(trafficIncidentLayer);
-              incidentCount++;
-            } catch (e) {
-              console.warn('Error processing incident:', e, incident);
-            }
-          });
-          
-          updateTrafficStatus('✓ ' + incidentCount + ' insiden dimuat', false);
-          console.log('Memuat ' + incidentCount + ' insiden lalu lintas dari TomTom API.');
-        })
-        .catch(function(error) {
-          console.error('Error fetching traffic incidents:', error);
-          var errorMsg = 'Error memuat insiden';
-          if (error.message.includes('401') || error.message.includes('403')) {
-            errorMsg = 'API key tidak valid';
-          } else if (error.message.includes('CORS')) {
-            errorMsg = 'Error CORS - cek konfigurasi server';
-          }
-          updateTrafficStatus('✗ ' + errorMsg, true);
-        });
-    }
-    
-    // Add refresh button event listener
-    var refreshTrafficBtn = document.getElementById('refreshTrafficBtn');
-    if (refreshTrafficBtn) {
-      refreshTrafficBtn.addEventListener('click', function() {
-        getTrafficIncidents();
-      });
-    }
-    
-    // Load traffic incidents on page load
-    getTrafficIncidents();
-    
-    // Refresh traffic incidents every 5 minutes
-    setInterval(getTrafficIncidents, 5 * 60 * 1000);
-
-    // ===============================
-    // GEOAI: HEATMAP KEPADATAN KECELAKAAN (DATA-DRIVEN)
-    // ===============================
-    /**
-     * Menggabungkan data blackspot dan laporan pengguna menjadi satu GeoJSON untuk heatmap
-     * @param {Object} blackspotData - Data GeoJSON dari file blackspot.geojson
-     * @returns {Object} GeoJSON yang sudah digabungkan
-     */
-    function combineDataForHeatmap(blackspotData) {
-      var combinedFeatures = [];
-      
-      // Tambahkan data dari blackspot.geojson
-      if (blackspotData && blackspotData.features && Array.isArray(blackspotData.features)) {
-        blackspotData.features.forEach(function(feature) {
-          combinedFeatures.push(feature);
-        });
-      }
-      
-      // Tambahkan data dari laporan pengguna (localStorage)
-      try {
-        var raw = localStorage.getItem('userReports');
-        if (raw) {
-          var userReportsData = JSON.parse(raw);
-          if (userReportsData && Array.isArray(userReportsData.features)) {
-            userReportsData.features.forEach(function(feature) {
-              combinedFeatures.push(feature);
-            });
-          }
-        }
-      } catch (e) {
-        console.warn('Gagal memuat laporan pengguna untuk heatmap:', e);
-      }
-      
-      return {
-        type: 'FeatureCollection',
-        features: combinedFeatures
-      };
-    }
-
-    /**
-     * Memperbarui heatmap dengan data terbaru (blackspot + laporan pengguna)
-     */
-    function refreshHeatmap() {
-      if (cachedBlackspotData) {
-        var combinedData = combineDataForHeatmap(cachedBlackspotData);
-        loadHeatmapFromGeoJSON(combinedData);
-      }
-    }
-
-    /**
-     * Menghitung weight berdasarkan jumlah kecelakaan (data-driven approach)
-     * @param {number} jumlahKecelakaan - Jumlah kejadian kecelakaan
-     * @returns {number} Weight untuk heatmap (0.3, 0.6, atau 1.0)
-     */
-    function calculateWeightFromAccidentCount(jumlahKecelakaan) {
-      if (!jumlahKecelakaan || isNaN(jumlahKecelakaan) || jumlahKecelakaan < 1) {
-        return 1.0; // Default weight jika atribut tidak ada
-      }
-      var count = parseInt(jumlahKecelakaan, 10);
-      if (count >= 1 && count <= 5) {
-        return 0.3;
-      } else if (count >= 6 && count <= 15) {
-        return 0.6;
-      } else if (count > 15) {
-        return 1.0;
-      }
-      return 1.0; // Fallback
-    }
-
-    /**
-     * Mengekstrak nilai jumlah kecelakaan dari feature properties
-     * Mencari berbagai kemungkinan nama atribut
-     * @param {Object} properties - Feature properties
-     * @returns {number|null} Jumlah kecelakaan atau null jika tidak ditemukan
-     */
-    function extractAccidentCount(properties) {
-      if (!properties) return null;
-      
-      // Daftar nama atribut yang mungkin berisi jumlah kecelakaan
-      var possibleKeys = [
-        'jumlah_kecelakaan', 'jumlahKecelakaan', 'jumlah', 'total',
-        'total_kecelakaan', 'totalKecelakaan', 'accident_count',
-        'count', 'frekuensi', 'frequency', 'jumlah_kejadian'
-      ];
-      
-      for (var i = 0; i < possibleKeys.length; i++) {
-        var key = possibleKeys[i];
-        if (properties.hasOwnProperty(key)) {
-          var value = properties[key];
-          // Coba konversi ke number
-          var numValue = parseFloat(value);
-          if (!isNaN(numValue) && numValue > 0) {
-            return numValue;
-          }
-        }
-      }
-      
-      return null;
-    }
-
-    /**
-     * Membuat atau memperbarui heatmap layer dari data GeoJSON Point
-     * Menggunakan pendekatan DATA-DRIVEN dengan weight otomatis
-     * @param {Object} geoJsonData - Data GeoJSON dengan feature Point
-     * @returns {L.HeatLayer|null} Layer heatmap atau null jika gagal
-     */
-    function loadHeatmapFromGeoJSON(geoJsonData) {
-      try {
-        if (!geoJsonData || !geoJsonData.features || !Array.isArray(geoJsonData.features)) {
-          console.warn('Data GeoJSON tidak valid untuk heatmap');
-          return null;
-        }
-
-        // Ekstrak koordinat dan weight dari Point features (DATA-DRIVEN)
-        var heatmapPoints = [];
-        var totalPoints = 0;
-        var weightedPoints = 0;
-        
-        geoJsonData.features.forEach(function(feature) {
-          if (feature.geometry && feature.geometry.type === 'Point' && feature.geometry.coordinates) {
-            var coords = feature.geometry.coordinates;
-            // Konversi dari GeoJSON format [lng, lat] ke format heatmap [lat, lng, weight]
-            if (coords.length >= 2 && typeof coords[0] === 'number' && typeof coords[1] === 'number') {
-              var lat = coords[1];
-              var lng = coords[0];
-              // Validasi koordinat
-              if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
-                // Ekstrak jumlah kecelakaan dari properties dan hitung weight
-                var jumlahKecelakaan = extractAccidentCount(feature.properties || {});
-                var weight = calculateWeightFromAccidentCount(jumlahKecelakaan);
-                
-                // Format: [lat, lng, weight] - DATA-DRIVEN dengan weight otomatis
-                heatmapPoints.push([lat, lng, weight]);
-                totalPoints++;
-                if (jumlahKecelakaan !== null) {
-                  weightedPoints++;
-                }
-              }
-            }
-          }
-        });
-
-        if (heatmapPoints.length === 0) {
-          console.warn('Tidak ada koordinat Point yang valid untuk heatmap');
-          return null;
-        }
-
-        // Hapus layer heatmap lama dari map dan Layer Control jika sudah ditambahkan
-        var wasOnMap = false;
-        if (heatmapLayer) {
-          if (map.hasLayer(heatmapLayer)) {
-            map.removeLayer(heatmapLayer);
-            wasOnMap = true;
-          }
-          // Hapus layer lama dari Layer Control
-          if (typeof layerControl !== 'undefined' && layerControl) {
-            try {
-              layerControl.removeLayer(heatmapLayer);
-            } catch (e) {
-              // Ignore jika layer tidak ada di control
-            }
-          }
-        }
-
-        // Buat layer heatmap baru dengan konfigurasi untuk skala kabupaten (DATA-DRIVEN)
-        var newHeatmapLayer = L.heatLayer(heatmapPoints, {
-          radius: 50,
-          blur: 30,
-          maxZoom: 17,
-          minOpacity: 0.5,
-          // Gradient kontinu: rendah (kuning) → sedang (oranye) → tinggi (merah)
-          gradient: {
-            0.0: 'yellow',
-            0.5: 'orange',
-            1.0: 'red'
-          }
-        });
-
-        // Update variabel dan reference di overlayMaps
-        heatmapLayer = newHeatmapLayer;
-        overlayMaps["GeoAI: Heatmap Kepadatan Kecelakaan"] = heatmapLayer;
-
-        // Tambahkan layer baru ke Layer Control agar bisa dikontrol
-        if (typeof layerControl !== 'undefined' && layerControl) {
-          layerControl.addOverlay(heatmapLayer, "GeoAI: Heatmap Kepadatan Kecelakaan");
-        }
-
-        // Tambahkan kembali ke map HANYA jika sebelumnya sudah aktif di Layer Control
-        // Jangan tambahkan secara default - biarkan user mengaktifkan melalui Layer Control
-        if (wasOnMap) {
-          heatmapLayer.addTo(map);
-        }
-
-        console.log('Heatmap GeoAI (DATA-DRIVEN) berhasil dibuat/diperbarui:');
-        console.log('  - Total titik: ' + totalPoints);
-        console.log('  - Titik dengan weight otomatis: ' + weightedPoints);
-        console.log('  - Titik dengan weight default: ' + (totalPoints - weightedPoints));
-        console.log('  - Aktifkan heatmap melalui Layer Control di pojok kanan atas peta');
-        return heatmapLayer;
-      } catch (error) {
-        console.error('Error membuat heatmap:', error);
-        return null;
-      }
-    }
-
-    // ===============================
-    // MUAT DATA GEOJSON DARI FILE
-    // ===============================
+    // 2. Load Blackspot Data
     fetch('data/blackspot.geojson')
-      .then(function(res) { return res.json(); })
-      .then(function(blackspotData) {
-        // Simpan data blackspot untuk digunakan saat refresh heatmap
-        cachedBlackspotData = blackspotData;
-        
-        var baseFeatures = (blackspotData.features || []);
-        baseFeatures.forEach(ensureFeatureId);
-        setAnalysisFeatures(baseFeatures);
-        activateButtons(analysisState);
-        var geoLayer = L.geoJSON(blackspotData, {
-          pointToLayer: function(feature, latlng) {
-            var marker = L.marker(latlng, { icon: redIcon });
-            registerMarker(feature, marker);
-            return marker;
-          },
-          onEachFeature: function(feature, layer) {
-            layer.bindTooltip(feature.properties.nama);
-            layer.on('click', function() {
-              updateSidebar(feature);
-              map.setView(layer.getLatLng(), 14);
-              reportDistanceToFeature(feature);
-            });
+      .then(res => res.json())
+      .then(data => {
+        if (data.features) {
+          data.features.forEach(addFeatureToMap);
+          updateStats();
+
+          // Load Heatmap
+          var heatPoints = data.features.map(f => [f.geometry.coordinates[1], f.geometry.coordinates[0], 0.5]);
+          heatmapLayer = L.heatLayer(heatPoints, { radius: 30, blur: 20 }).addTo(map);
+
+          // Zoom to first point
+          if (data.features.length > 0) {
+            var first = data.features[0].geometry.coordinates;
+            map.setView([first[1], first[0]], 11);
+          }
+        }
+      })
+      .catch(err => console.error("Failed handling geojson", err));
+
+    // 3. TomTom Traffic
+    function loadTraffic() {
+      var apiKey = '4CZMpEqq9NEItsBXz1h0bshCz1RArdEs';
+      var url = 'https://api.tomtom.com/traffic/services/5/incidentDetails?bbox=106.27,-7.38,107.07,-6.57&fields={incidents{type,geometry{type,coordinates},properties{iconCategory}}}&language=en-GB&categoryFilter=1&timeValidityFilter=present&key=' + apiKey;
+
+      document.getElementById('trafficStatus').innerText = "Updating traffic...";
+
+      fetch(url).then(r => r.json()).then(data => {
+        trafficIncidentLayer.clearLayers();
+        var incidents = data.incidents || [];
+        document.getElementById('stats-tomtom').innerText = incidents.length;
+        document.getElementById('trafficStatus').innerText = "Live Traffic: " + incidents.length + " incident(s)";
+
+        incidents.forEach(inc => {
+          if (inc.geometry.type === 'Point') {
+            // Simple marker for traffic
+            L.circleMarker([inc.geometry.coordinates[1], inc.geometry.coordinates[0]], {
+              radius: 6, color: '#f59e0b', fillOpacity: 0.8
+            }).bindPopup("Traffic Incident: " + inc.properties.iconCategory).addTo(trafficIncidentLayer);
           }
         });
-        geoLayer.addTo(markerLayer);
-
-        // Pilih satu data pertama untuk ditampilkan di sidebar saat awal
-        if (blackspotData.features && blackspotData.features.length > 0) {
-          updateSidebar(blackspotData.features[0]);
-        }
-
-        // Muat laporan pengguna dari localStorage
-        loadUserReports();
-
-        // Muat heatmap GeoAI dari data blackspot + laporan pengguna (gabungan)
-        var combinedData = combineDataForHeatmap(blackspotData);
-        loadHeatmapFromGeoJSON(combinedData);
-      })
-      .catch(function(err) {
-        console.error('Gagal memuat data GeoJSON:', err);
+      }).catch(e => {
+        document.getElementById('trafficStatus').innerText = "Traffic Offline";
       });
+    }
+
+    loadTraffic();
+    document.getElementById('refreshTrafficBtn').onclick = loadTraffic;
+
+    // --- Layers Control ---
+    var baseMaps = { "OpenStreetMap": osm, "Satellite": satellite };
+    var overlays = {
+      "Blackspots": markerLayer,
+      "User Reports": userReportLayer,
+      "TomTom Traffic": trafficIncidentLayer
+      // Heatmap handled manually as it might be null initially
+    };
+    L.control.layers(baseMaps, overlays).addTo(map);
+
   </script>
 </body>
+
 </html>
