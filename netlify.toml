@@ -1,0 +1,4 @@
+[[redirects]]
+from "/*"
+to "/Map.html"
+status = 200
